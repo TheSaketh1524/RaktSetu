@@ -19,7 +19,7 @@
 ![Request Flow](screenshots/4.png)
 
 ### 🚨 Matching Result
-![Matching](screenshots/Accpeting.png)
+![Matching](screenshots/AP.png)
 
 ### 🧑‍⚕️ Donor Dashboard
-![Donor Dashboard](screenshots/Donordashboard.png)
+![Donor Dashboard](screenshots/DonorD.png)

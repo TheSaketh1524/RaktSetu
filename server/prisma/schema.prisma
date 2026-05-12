@@ -1,0 +1,210 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(DONOR)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  donor         Donor?
+  hospital      Hospital?
+  bloodBank     BloodBank?
+}
+
+enum Role {
+  DONOR
+  HOSPITAL
+  BLOOD_BANK
+  ADMIN
+}
+
+model Donor {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  name              String
+  phone             String    @unique
+  bloodType         BloodType
+  latitude          Float
+  longitude         Float
+  address           String
+  isAvailable       Boolean   @default(true)
+  isEligible        Boolean   @default(true)  // false if donated < 56 days ago
+  lastDonationDate  DateTime?
+  totalDonations    Int       @default(0)
+
+  // Scoring fields
+  readinessScore    Float     @default(50.0)   // 0-100
+  reliabilityScore  Float     @default(50.0)   // 0-100
+  responseRate      Float     @default(0.0)    // % of alerts responded to
+  alertsReceived    Int       @default(0)
+  alertsResponded   Int       @default(0)
+  noShowCount       Int       @default(0)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  alertResponses    AlertResponse[]
+  donations         DonationRecord[]
+}
+
+model Hospital {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  name        String
+  phone       String
+  latitude    Float
+  longitude   Float
+  address     String
+  district    String
+
+  createdAt   DateTime  @default(now())
+  bloodRequests BloodRequest[]
+  inventory   Inventory[]
+}
+
+model BloodBank {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  name        String
+  phone       String
+  latitude    Float
+  longitude   Float
+  address     String
+
+  createdAt   DateTime  @default(now())
+  inventory   Inventory[]
+}
+
+model BloodRequest {
+  id            String        @id @default(uuid())
+  hospitalId    String
+  hospital      Hospital      @relation(fields: [hospitalId], references: [id])
+  bloodType     BloodType
+  units         Int
+  urgency       UrgencyLevel
+  status        RequestStatus @default(OPEN)
+  patientName   String?
+  patientAge    Int?
+  notes         String?
+
+  // Matching
+  matchedDonorId  String?
+  matchedAt       DateTime?
+  fulfilledAt     DateTime?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  alerts        Alert[]
+}
+
+enum UrgencyLevel {
+  CRITICAL    // Need within 1 hour
+  URGENT      // Need within 6 hours
+  SCHEDULED   // Need within 24-48 hours
+}
+
+enum RequestStatus {
+  OPEN
+  MATCHED
+  FULFILLED
+  CANCELLED
+  EXPIRED
+}
+
+model Alert {
+  id              String        @id @default(uuid())
+  bloodRequestId  String
+  bloodRequest    BloodRequest  @relation(fields: [bloodRequestId], references: [id])
+  donorId         String
+  channel         AlertChannel
+  sentAt          DateTime      @default(now())
+  status          AlertStatus   @default(SENT)
+
+  response        AlertResponse?
+}
+
+enum AlertChannel {
+  PUSH
+  SMS
+  BOTH
+}
+
+enum AlertStatus {
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model AlertResponse {
+  id        String    @id @default(uuid())
+  alertId   String    @unique
+  alert     Alert     @relation(fields: [alertId], references: [id])
+  donorId   String
+  donor     Donor     @relation(fields: [donorId], references: [id])
+  response  DonorResponse
+  respondedAt DateTime @default(now())
+}
+
+enum DonorResponse {
+  ACCEPTED
+  DECLINED
+  NO_RESPONSE
+}
+
+model Inventory {
+  id          String    @id @default(uuid())
+  entityType  EntityType
+  hospitalId  String?
+  hospital    Hospital? @relation(fields: [hospitalId], references: [id])
+  bloodBankId String?
+  bloodBank   BloodBank? @relation(fields: [bloodBankId], references: [id])
+  bloodType   BloodType
+  units       Int
+  lastUpdated DateTime  @default(now())
+  updatedBy   String    // userId who last updated
+
+  @@unique([hospitalId, bloodType])
+  @@unique([bloodBankId, bloodType])
+}
+
+enum EntityType {
+  HOSPITAL
+  BLOOD_BANK
+}
+
+model DonationRecord {
+  id          String    @id @default(uuid())
+  donorId     String
+  donor       Donor     @relation(fields: [donorId], references: [id])
+  donatedAt   DateTime
+  locationName String
+  units       Float     @default(1.0)
+  verified    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+}
+
+enum BloodType {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
